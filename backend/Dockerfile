@@ -1,25 +1,23 @@
-# VideoFarm AI Video Engine - Backend Dockerfile
-FROM python:3.12-slim
+# Use an official Python runtime as a parent image
+FROM python:3.11-slim
 
-# Install system dependencies (FFmpeg is mandatory for video rendering)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies (ffmpeg is required for edge-tts and yt-dlp)
+RUN apt-get update && apt-get install -y \
     ffmpeg \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Set the working directory
 WORKDIR /app
 
-# Install Python dependencies
+# Copy the requirements file and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend source code
+# Copy the rest of the backend code
 COPY . .
 
-# Set environment defaults
-ENV PYTHONUNBUFFERED=1
-ENV OUTPUT_DIR=/app/output
-
+# Expose the port FastAPI runs on
 EXPOSE 8000
 
+# Run the FastAPI application using Uvicorn
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
