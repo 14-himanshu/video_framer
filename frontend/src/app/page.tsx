@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Film,
   Sparkles,
@@ -18,10 +18,6 @@ import {
   DollarSign,
   Video,
   Flame,
-  Radio,
-  ExternalLink,
-  ChevronRight,
-  Terminal,
   Volume2
 } from "lucide-react";
 
@@ -100,37 +96,14 @@ export default function VideoFarmStudio() {
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const terminalEndRef = useRef<HTMLDivElement | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const swapCounterRef = useRef<number>(1);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Fetch initial system status and voices
-  useEffect(() => {
-    fetch("/api/status")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.status === "online") setSystemOnline(true);
-      })
-      .catch(() => setSystemOnline(false));
-
-    fetch("/api/voices")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.voices) setVoices(data.voices);
-      })
-      .catch((e) => console.error("Error fetching voices:", e));
-
-    fetchGallery();
-  }, []);
-
-  // Autoscroll terminal
-  useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [terminalLogs]);
-
-  const fetchGallery = async () => {
+  const fetchGallery = useCallback(async () => {
     try {
       const res = await fetch("/api/jobs");
       const data = await res.json();
@@ -138,7 +111,44 @@ export default function VideoFarmStudio() {
     } catch (e) {
       console.error("Gallery fetch failed:", e);
     }
-  };
+  }, []);
+
+  // Fetch initial system status, voices, and job gallery
+  useEffect(() => {
+    let ignore = false;
+
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!ignore && data.status === "online") setSystemOnline(true);
+      })
+      .catch(() => {
+        if (!ignore) setSystemOnline(false);
+      });
+
+    fetch("/api/voices")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!ignore && data.voices) setVoices(data.voices);
+      })
+      .catch((e) => console.error("Error fetching voices:", e));
+
+    fetch("/api/jobs")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!ignore && data.jobs) setJobs(data.jobs);
+      })
+      .catch((e) => console.error("Gallery fetch failed:", e));
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  // Autoscroll terminal
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [terminalLogs]);
 
   // Voice Preview Player
   const toggleVoicePreview = (voiceId: string, e: React.MouseEvent) => {
@@ -222,8 +232,9 @@ export default function VideoFarmStudio() {
       if (!data.success) throw new Error(data.detail || "Failed to start render");
 
       listenToStream(data.job_id);
-    } catch (e: any) {
-      showToast(`Error: ${e.message}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to start render";
+      showToast(`Error: ${msg}`);
       setIsRendering(false);
     }
   };
@@ -286,35 +297,42 @@ export default function VideoFarmStudio() {
   };
 
   // Swap Scene Visual
-  const handleRegenerateSceneVisual = async (idx: number) => {
-    if (!storyboard) return;
-    const sc = storyboard.scenes[idx];
-    showToast(`Sourcing new image for Scene ${idx + 1}...`);
+  const handleRegenerateSceneVisual = useCallback(
+    async (idx: number) => {
+      if (!storyboard) return;
+      const sc = storyboard.scenes[idx];
+      showToast(`Sourcing new image for Scene ${idx + 1}...`);
 
-    try {
-      const res = await fetch("/api/generate-scene-visual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: sc.search_query || topic,
-          prompt: sc.image_prompt,
-          is_vertical: aspectFormat === "short",
-          source: visualEngine,
-          scene_index: idx + Math.floor(Math.random() * 5) + 1,
-          topic
-        })
-      });
-      const data = await res.json();
-      if (data.success && data.image_url) {
-        const updatedScenes = [...storyboard.scenes];
-        updatedScenes[idx].preview_image = data.image_url;
-        setStoryboard({ ...storyboard, scenes: updatedScenes });
-        showToast(`Scene ${idx + 1} visual updated!`);
+      const offset = ((swapCounterRef.current++) % 5) + 1;
+      try {
+        const res = await fetch("/api/generate-scene-visual", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: sc.search_query || topic,
+            prompt: sc.image_prompt,
+            is_vertical: aspectFormat === "short",
+            source: visualEngine,
+            scene_index: idx + offset,
+            topic
+          })
+        });
+        const data = await res.json();
+        if (data.success && data.image_url) {
+          setStoryboard((prev) => {
+            if (!prev) return prev;
+            const updatedScenes = [...prev.scenes];
+            updatedScenes[idx] = { ...updatedScenes[idx], preview_image: data.image_url };
+            return { ...prev, scenes: updatedScenes };
+          });
+          showToast(`Scene ${idx + 1} visual updated!`);
+        }
+      } catch {
+        showToast("Could not refresh image");
       }
-    } catch {
-      showToast("Could not refresh image");
-    }
-  };
+    },
+    [storyboard, topic, aspectFormat, visualEngine]
+  );
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans">
@@ -669,7 +687,7 @@ export default function VideoFarmStudio() {
                 {/* Video Player */}
                 {currentJob?.video_url && (
                   <video
-                    src={`${currentJob.video_url}?t=${Date.now()}`}
+                    src={`${currentJob.video_url}?id=${currentJob.job_id}`}
                     controls
                     autoPlay
                     className="w-full h-full object-cover block"

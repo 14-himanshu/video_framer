@@ -12,16 +12,24 @@ from typing import List, Dict, Any, Optional, Callable
 import requests
 import edge_tts
 
-# Auto-load .env if present
-_env_path = Path(__file__).resolve().parent / ".env"
-if _env_path.exists():
-    for _line in _env_path.read_text(encoding="utf-8").splitlines():
-        _line = _line.strip()
-        if _line.startswith("GROQ_API_KEY="):
-            _val = _line.split("=", 1)[1].strip().strip('"').strip("'")
-            if _val and not _val.startswith("gsk_your_"):
-                os.environ["GROQ_API_KEY"] = _val
-                break
+# Auto-load .env if present (check both backend/.env and project root .env)
+BASE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BASE_DIR.parent if (BASE_DIR.parent / ".env").exists() or (BASE_DIR.parent / "frontend").exists() else BASE_DIR
+
+for candidate in [BASE_DIR / ".env", ROOT_DIR / ".env"]:
+    if candidate.exists():
+        for _line in candidate.read_text(encoding="utf-8").splitlines():
+            _line = _line.strip()
+            if _line.startswith("GROQ_API_KEY="):
+                _val = _line.split("=", 1)[1].strip().strip('"').strip("'")
+                if _val and not _val.startswith("gsk_your_"):
+                    os.environ["GROQ_API_KEY"] = _val
+                    break
+        if os.getenv("GROQ_API_KEY"):
+            break
+
+OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(ROOT_DIR / "output")))
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 AVAILABLE_VOICES = [
     {"id": "en-US-ChristopherNeural", "name": "Christopher (US)", "gender": "Male", "tone": "Deep, Authoritative Documentary", "lang": "en-US", "avatar": "🎙️"},
@@ -38,7 +46,7 @@ AVAILABLE_VOICES = [
 
 def get_voice_preview_path(voice_id: str) -> Path:
     """Generates and caches a voice preview snippet."""
-    preview_dir = Path("./output/previews")
+    preview_dir = OUTPUT_DIR / "previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
     audio_file = preview_dir / f"{voice_id}.mp3"
     if not audio_file.exists():
@@ -481,7 +489,7 @@ def execute_video_pipeline(
         if log_fn:
             log_fn(msg, percent, step)
 
-    work_dir = Path("./output") / job_id
+    work_dir = OUTPUT_DIR / job_id
     work_dir.mkdir(parents=True, exist_ok=True)
     is_vertical = (format_type == "short")
 
