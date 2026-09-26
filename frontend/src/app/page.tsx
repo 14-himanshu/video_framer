@@ -18,7 +18,8 @@ import {
   DollarSign,
   Video,
   Flame,
-  Volume2
+  Volume2,
+  Scissors
 } from "lucide-react";
 
 interface Voice {
@@ -64,7 +65,10 @@ interface Job {
 
 export default function VideoFarmStudio() {
   // Navigation & View Tabs
-  const [activeTab, setActiveTab] = useState<"studio" | "storyboard" | "gallery" | "monetization" | "settings">("studio");
+  const [activeTab, setActiveTab] = useState<"studio" | "storyboard" | "gallery" | "monetization" | "settings" | "clipper">("studio");
+
+  // Clipper State
+  const [clipperUrl, setClipperUrl] = useState("");
 
   // Studio Form State
   const [topic, setTopic] = useState("The Secrets of Black Holes");
@@ -239,6 +243,31 @@ export default function VideoFarmStudio() {
     }
   };
 
+  const handleClipYouTube = async () => {
+    if (!clipperUrl.trim()) {
+      showToast("Please enter a YouTube URL!");
+      return;
+    }
+    setIsRendering(true);
+    setRenderProgress(0);
+    setRenderStep("Queueing Clipper...");
+    setTerminalLogs([`[${new Date().toLocaleTimeString()}] Clip queued...`]);
+    try {
+      const res = await fetch("/api/clip-youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: clipperUrl })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.detail);
+      setActiveTab("studio");
+      listenToStream(data.job_id);
+    } catch (e: any) {
+      showToast(`Error: ${e.message}`);
+      setIsRendering(false);
+    }
+  };
+
   // Stream Server-Sent Events
   const listenToStream = (jobId: string) => {
     if (eventSourceRef.current) eventSourceRef.current.close();
@@ -335,14 +364,14 @@ export default function VideoFarmStudio() {
   );
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-zinc-950 text-zinc-200 flex flex-col font-sans">
       {/* Hidden Audio Element for Voice Previews */}
       <audio ref={audioPreviewRef} className="hidden" preload="none" />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 border border-purple-500/40 text-white px-5 py-3 rounded-xl shadow-2xl backdrop-blur-md flex items-center gap-3 animate-fade-in text-sm font-medium">
-          <Sparkles className="w-4 h-4 text-purple-400" />
+        <div className="fixed bottom-6 right-6 z-50 bg-zinc-900 border border-zinc-800 text-white px-5 py-3 rounded-xl shadow-xl backdrop-blur-md flex items-center gap-3 animate-fade-in text-sm font-medium">
+          <Sparkles className="w-4 h-4 text-indigo-400" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -350,32 +379,31 @@ export default function VideoFarmStudio() {
       {/* ============================================================
           TOP APP HEADER
           ============================================================ */}
-      <header className="sticky top-0 z-40 bg-[#0d111d]/85 backdrop-blur-xl border-b border-white/10 px-6 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-purple-500/20 text-white font-bold">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm text-white font-bold">
             <Film className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-purple-300 bg-clip-text text-transparent">
-                VideoFarm Studio
+              <h1 className="font-semibold text-lg tracking-tight text-white bg-clip-text text-transparent">
+                VideoFarm
               </h1>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-800 text-indigo-400 border border-zinc-800">
                 Next.js Pro
               </span>
             </div>
-            <p className="text-xs text-slate-400">Zero-Cost Autonomous Video Infrastructure</p>
+            <p className="text-xs text-zinc-400">AI Video Generation Platform</p>
           </div>
         </div>
 
         {/* Center Mode Switcher Tabs */}
-        <nav className="flex items-center bg-black/40 border border-white/10 rounded-xl p-1">
+        <nav className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1">
           <button
             onClick={() => setActiveTab("studio")}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === "studio"
-                ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
-                : "text-slate-400 hover:text-white"
+                ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-400 hover:text-white"
             }`}
           >
             <Tv className="w-3.5 h-3.5" />
@@ -389,8 +417,7 @@ export default function VideoFarmStudio() {
             }}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === "storyboard"
-                ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
-                : "text-slate-400 hover:text-white"
+                ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-400 hover:text-white"
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -401,8 +428,7 @@ export default function VideoFarmStudio() {
             onClick={() => setActiveTab("gallery")}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === "gallery"
-                ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
-                : "text-slate-400 hover:text-white"
+                ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-400 hover:text-white"
             }`}
           >
             <Video className="w-3.5 h-3.5" />
@@ -414,8 +440,7 @@ export default function VideoFarmStudio() {
             onClick={() => setActiveTab("monetization")}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === "monetization"
-                ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
-                : "text-slate-400 hover:text-white"
+                ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-400 hover:text-white"
             }`}
           >
             <DollarSign className="w-3.5 h-3.5" />
@@ -426,18 +451,28 @@ export default function VideoFarmStudio() {
             onClick={() => setActiveTab("settings")}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === "settings"
-                ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
-                : "text-slate-400 hover:text-white"
+                ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-400 hover:text-white"
             }`}
           >
             <Settings className="w-3.5 h-3.5" />
             <span>Settings</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("clipper")}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === "clipper"
+                ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Scissors className="w-3.5 h-3.5" />
+            <span>YouTube Clipper</span>
+          </button>
         </nav>
 
         {/* Engine Status Badge */}
         <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/25 px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-400">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-emerald-400 " />
           <span>{systemOnline ? "Engine Online" : "Connecting..."}</span>
         </div>
       </header>
@@ -447,31 +482,31 @@ export default function VideoFarmStudio() {
           ============================================================ */}
       {activeTab === "studio" && (
         <main className="max-w-[1600px] w-full mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[480px_1fr] gap-6 items-start">
-          {/* Left Column: Director's Control Deck */}
-          <aside className="bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col gap-6">
-            <div className="flex items-center justify-between pb-3 border-b border-white/5">
-              <h2 className="font-bold text-sm uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-purple-400" />
+          {/* Left Column: Project Settings */}
+          <aside className="bg-zinc-900 backdrop-blur-2xl border border-zinc-800 rounded-2xl p-6 shadow-xl flex flex-col gap-6">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <h2 className="font-bold text-sm uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-indigo-400" />
                 <span>Director&apos;s Control Deck</span>
               </h2>
-              <span className="text-[11px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">
-                $0.00 Stack
+              <span className="text-[11px] font-mono text-zinc-300 bg-zinc-800 border border-zinc-800 px-2 py-0.5 rounded-full">
+                Free Tier
               </span>
             </div>
 
             {/* 1. Topic Search Bar & Niche Chips */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
                 Documentary Topic or Idea
               </label>
               <div className="relative">
-                <Flame className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Flame className="w-4 h-4 text-indigo-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   placeholder="e.g., The Secret of Roman Concrete..."
-                  className="w-full bg-black/60 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                 />
               </div>
 
@@ -491,7 +526,7 @@ export default function VideoFarmStudio() {
                       setTopic(preset);
                       showToast(`Topic loaded: ${preset}`);
                     }}
-                    className="text-xs bg-white/5 hover:bg-purple-500/15 border border-white/5 hover:border-purple-500/30 text-slate-300 hover:text-white px-2.5 py-1 rounded-full transition-all"
+                    className="text-xs bg-white/5 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-800 text-zinc-200 hover:text-white px-2.5 py-1 rounded-full transition-all"
                   >
                     {preset}
                   </button>
@@ -501,7 +536,7 @@ export default function VideoFarmStudio() {
 
             {/* 2. Target Platform & Aspect Ratio Switcher */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
                 Format & Aspect Ratio
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -510,16 +545,16 @@ export default function VideoFarmStudio() {
                   onClick={() => setAspectFormat("long")}
                   className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${
                     aspectFormat === "long"
-                      ? "bg-purple-600/15 border-purple-500 shadow-lg shadow-purple-500/10 text-white"
-                      : "bg-black/30 border-white/5 hover:border-white/20 text-slate-400"
+                      ? "bg-zinc-800 border-indigo-500 shadow-sm text-white"
+                      : "bg-zinc-900 border-zinc-800 hover:border-zinc-800 text-zinc-400"
                   }`}
                 >
-                  <div className={`p-2.5 rounded-lg ${aspectFormat === "long" ? "bg-purple-600 text-white" : "bg-white/5"}`}>
+                  <div className={`p-2.5 rounded-lg ${aspectFormat === "long" ? "bg-indigo-600 text-white" : "bg-white/5"}`}>
                     <Tv className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="font-bold text-xs">16:9 Landscape</div>
-                    <div className="text-[11px] text-slate-400">YouTube Long-Form (720p)</div>
+                    <div className="text-[11px] text-zinc-400">YouTube Long-Form (720p)</div>
                   </div>
                 </button>
 
@@ -528,16 +563,16 @@ export default function VideoFarmStudio() {
                   onClick={() => setAspectFormat("short")}
                   className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${
                     aspectFormat === "short"
-                      ? "bg-purple-600/15 border-purple-500 shadow-lg shadow-purple-500/10 text-white"
-                      : "bg-black/30 border-white/5 hover:border-white/20 text-slate-400"
+                      ? "bg-zinc-800 border-indigo-500 shadow-sm text-white"
+                      : "bg-zinc-900 border-zinc-800 hover:border-zinc-800 text-zinc-400"
                   }`}
                 >
-                  <div className={`p-2.5 rounded-lg ${aspectFormat === "short" ? "bg-purple-600 text-white" : "bg-white/5"}`}>
+                  <div className={`p-2.5 rounded-lg ${aspectFormat === "short" ? "bg-indigo-600 text-white" : "bg-white/5"}`}>
                     <Smartphone className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="font-bold text-xs">9:16 Vertical</div>
-                    <div className="text-[11px] text-slate-400">Shorts / Reels / TikTok</div>
+                    <div className="text-[11px] text-zinc-400">Shorts / Reels / TikTok</div>
                   </div>
                 </button>
               </div>
@@ -546,10 +581,10 @@ export default function VideoFarmStudio() {
             {/* 3. Narrator Voice Matrix (With Audio Preview!) */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Narrator Voice Cast
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Voiceover
                 </label>
-                <span className="text-[11px] text-purple-400 flex items-center gap-1">
+                <span className="text-[11px] text-indigo-400 flex items-center gap-1">
                   <Volume2 className="w-3 h-3" /> Click ▶ for audio preview
                 </span>
               </div>
@@ -561,8 +596,8 @@ export default function VideoFarmStudio() {
                     onClick={() => setSelectedVoice(v.id)}
                     className={`p-2.5 rounded-xl border cursor-pointer flex items-center justify-between transition-all ${
                       selectedVoice === v.id
-                        ? "bg-purple-600/20 border-purple-500 text-white shadow-md shadow-purple-500/20"
-                        : "bg-black/30 border-white/5 hover:bg-white/5 text-slate-300"
+                        ? "bg-zinc-800 border-indigo-500 text-white shadow-sm"
+                        : "bg-zinc-900 border-zinc-800 hover:bg-white/5 text-zinc-200"
                     }`}
                   >
                     <div className="min-w-0 pr-2">
@@ -570,14 +605,14 @@ export default function VideoFarmStudio() {
                         <span>{v.avatar || "🎙️"}</span>
                         <span>{v.name}</span>
                       </div>
-                      <div className="text-[10px] text-slate-400 truncate">{v.tone}</div>
+                      <div className="text-[10px] text-zinc-400 truncate">{v.tone}</div>
                     </div>
                     <button
                       onClick={(e) => toggleVoicePreview(v.id, e)}
                       className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition-transform ${
                         playingVoiceId === v.id
                           ? "bg-cyan-400 text-black scale-110 shadow-lg shadow-cyan-400/50"
-                          : "bg-white/10 hover:bg-purple-600 text-white"
+                          : "bg-white/10 hover:bg-indigo-600 text-white"
                       }`}
                       title="Play Voice Sample"
                     >
@@ -590,13 +625,13 @@ export default function VideoFarmStudio() {
 
             {/* 4. Visual Engine & Pacing Slider */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Visual Sourcing Engine
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
+                Visual Engine
               </label>
               <select
                 value={visualEngine}
                 onChange={(e) => setVisualEngine(e.target.value)}
-                className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 px-3.5 text-xs text-white focus:outline-none focus:border-purple-500"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-2.5 px-3.5 text-xs text-white focus:outline-none focus:border-indigo-500"
               >
                 <option value="auto">🌐 Real-Time Web Topic Search (DuckDuckGo + Wikipedia HD)</option>
                 <option value="ai">🎨 AI Art Generation (Pollinations Turbo with Web Fallback)</option>
@@ -606,10 +641,10 @@ export default function VideoFarmStudio() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
                   Scene Count & Duration
                 </label>
-                <span className="font-mono text-xs text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                <span className="font-mono text-xs text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded border border-zinc-800">
                   {scenesCount} Scenes (~{scenesCount * (aspectFormat === "short" ? 8 : 12)}s)
                 </span>
               </div>
@@ -628,16 +663,16 @@ export default function VideoFarmStudio() {
               <button
                 disabled={isRendering}
                 onClick={() => handleStartRender(false)}
-                className="py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-bold text-xs tracking-wide shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                className="py-3 px-4 rounded-xl bg-white text-zinc-950 hover:bg-zinc-200 text-white font-bold text-xs tracking-wide shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>1-Click Render</span>
+                <span>Generate Video</span>
               </button>
 
               <button
                 disabled={isRendering}
                 onClick={handleGenerateScript}
-                className="py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs tracking-wide flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                className="py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-zinc-800 text-white font-bold text-xs tracking-wide flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
                 <Layers className="w-4 h-4" />
                 <span>Edit Script First</span>
@@ -648,37 +683,37 @@ export default function VideoFarmStudio() {
           {/* Right Column: Cinema Monitor & Live Pipeline */}
           <section className="flex flex-col gap-6">
             {/* Cinema Monitor */}
-            <div className="bg-[#020408] border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative">
+            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl relative">
               <div
                 className={`w-full flex items-center justify-center relative transition-all ${
                   aspectFormat === "long"
                     ? "aspect-video"
-                    : "aspect-[9/16] max-h-[580px] max-w-[340px] mx-auto my-6 rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+                    : "aspect-[9/16] max-h-[580px] max-w-[340px] mx-auto my-6 rounded-2xl overflow-hidden shadow-xl border border-zinc-800"
                 }`}
               >
                 {/* Standby Empty View */}
                 {!currentJob?.video_url && !isRendering && (
                   <div className="text-center p-8 max-w-md">
-                    <div className="w-16 h-16 rounded-full bg-purple-500/10 border border-purple-500/25 flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse">
+                    <div className="w-16 h-16 rounded-full bg-zinc-800 border border-zinc-800 flex items-center justify-center text-3xl mx-auto mb-4 ">
                       🎬
                     </div>
-                    <h3 className="font-extrabold text-base mb-1.5">Cinema Monitor Standby</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Enter a topic on the left and click <strong>1-Click Render</strong>. The engine will write an AI script, synthesize neural speech, source HD photos, and render Ken Burns motion clips.
+                    <h3 className="font-semibold text-base mb-1.5">Preview Window</h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Enter a topic on the left and click <strong>Generate Video</strong>. The engine will write an AI script, synthesize neural speech, source HD photos, and render Ken Burns motion clips.
                     </p>
 
                     <div className="grid grid-cols-3 gap-2 mt-6 text-left">
-                      <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
-                        <div className="text-[10px] text-slate-400 uppercase font-bold">Speed</div>
-                        <div className="text-xs font-bold text-cyan-400 font-mono">~30 sec</div>
+                      <div className="bg-white/5 p-2.5 rounded-xl border border-zinc-800">
+                        <div className="text-[10px] text-zinc-400 uppercase font-bold">Speed</div>
+                        <div className="text-xs font-bold text-zinc-300 font-mono">~30 sec</div>
                       </div>
-                      <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
-                        <div className="text-[10px] text-slate-400 uppercase font-bold">Cost</div>
+                      <div className="bg-white/5 p-2.5 rounded-xl border border-zinc-800">
+                        <div className="text-[10px] text-zinc-400 uppercase font-bold">Cost</div>
                         <div className="text-xs font-bold text-emerald-400 font-mono">$0.00</div>
                       </div>
-                      <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
-                        <div className="text-[10px] text-slate-400 uppercase font-bold">Quality</div>
-                        <div className="text-xs font-bold text-purple-400 font-mono">HD 30 FPS</div>
+                      <div className="bg-white/5 p-2.5 rounded-xl border border-zinc-800">
+                        <div className="text-[10px] text-zinc-400 uppercase font-bold">Quality</div>
+                        <div className="text-xs font-bold text-indigo-400 font-mono">HD 30 FPS</div>
                       </div>
                     </div>
                   </div>
@@ -698,55 +733,55 @@ export default function VideoFarmStudio() {
 
             {/* Live Multi-Track Pipeline Visualizer (Shown while rendering) */}
             {isRendering && (
-              <div className="bg-slate-900/70 border border-cyan-500/30 rounded-2xl p-6 shadow-2xl">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5 text-cyan-400 font-bold text-sm">
-                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+                  <div className="flex items-center gap-2.5 text-zinc-300 font-bold text-sm">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 " />
                     <span>{renderStep}</span>
                   </div>
-                  <span className="font-mono text-lg font-extrabold text-white">{renderProgress}%</span>
+                  <span className="font-mono text-lg font-semibold text-white">{renderProgress}%</span>
                 </div>
 
                 {/* Multi-Track Progress Visualizer */}
                 <div className="space-y-3 mb-4">
                   <div>
-                    <div className="flex justify-between text-xs text-slate-300 font-semibold mb-1">
-                      <span>Neural Voiceover & Word Timestamps</span>
-                      <span className="font-mono text-cyan-400">{Math.min(100, renderProgress * 2.5)}%</span>
+                    <div className="flex justify-between text-xs text-zinc-200 font-semibold mb-1">
+                      <span>Audio & Transcription</span>
+                      <span className="font-mono text-zinc-300">{Math.min(100, renderProgress * 2.5)}%</span>
                     </div>
                     <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
+                        className="h-full bg-indigo-500 transition-all duration-300"
                         style={{ width: `${Math.min(100, renderProgress * 2.5)}%` }}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex justify-between text-xs text-slate-300 font-semibold mb-1">
-                      <span>Real-Time Topic Visual Sourcing</span>
-                      <span className="font-mono text-cyan-400">
+                    <div className="flex justify-between text-xs text-zinc-200 font-semibold mb-1">
+                      <span>Media Sourcing</span>
+                      <span className="font-mono text-zinc-300">
                         {renderProgress > 30 ? Math.min(100, (renderProgress - 30) * 2.5) : 0}%
                       </span>
                     </div>
                     <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-300"
+                        className="h-full bg-indigo-500 transition-all duration-300"
                         style={{ width: `${renderProgress > 30 ? Math.min(100, (renderProgress - 30) * 2.5) : 0}%` }}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex justify-between text-xs text-slate-300 font-semibold mb-1">
-                      <span>Ken Burns Motion & Subtitle Rendering</span>
-                      <span className="font-mono text-cyan-400">
+                    <div className="flex justify-between text-xs text-zinc-200 font-semibold mb-1">
+                      <span>Video Compositing</span>
+                      <span className="font-mono text-zinc-300">
                         {renderProgress > 65 ? Math.min(100, (renderProgress - 65) * 3) : 0}%
                       </span>
                     </div>
                     <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300"
+                        className="h-full bg-indigo-500 transition-all duration-300"
                         style={{ width: `${renderProgress > 65 ? Math.min(100, (renderProgress - 65) * 3) : 0}%` }}
                       />
                     </div>
@@ -754,7 +789,7 @@ export default function VideoFarmStudio() {
                 </div>
 
                 {/* Streaming Terminal Dock */}
-                <div className="bg-black/70 border border-white/10 rounded-xl p-3.5 font-mono text-xs text-cyan-300 h-36 overflow-y-auto leading-relaxed">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 font-mono text-xs text-zinc-300 h-36 overflow-y-auto leading-relaxed">
                   {terminalLogs.map((log, i) => (
                     <div key={i} className="mb-1">
                       {log}
@@ -767,16 +802,16 @@ export default function VideoFarmStudio() {
 
             {/* YouTube & Social Media Launchpad */}
             {currentJob?.video_url && (
-              <div className="bg-slate-900/60 border border-purple-500/30 rounded-2xl p-6 shadow-2xl flex flex-col gap-4">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-extrabold text-base text-white">🚀 YouTube & Social Media Launchpad</h3>
-                    <p className="text-xs text-slate-400">Pre-optimized title, description, and tags ready for copy-paste.</p>
+                    <h3 className="font-semibold text-base text-white">🚀 YouTube & Social Media Launchpad</h3>
+                    <p className="text-xs text-zinc-400">Pre-optimized title, description, and tags ready for copy-paste.</p>
                   </div>
                   <a
                     href={currentJob.video_url}
                     download="documentary.mp4"
-                    className="py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 transition-all"
+                    className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-600 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-all"
                   >
                     <Download className="w-4 h-4" />
                     <span>Download MP4</span>
@@ -784,12 +819,12 @@ export default function VideoFarmStudio() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="bg-black/40 border border-white/5 rounded-xl p-3.5">
-                    <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-400 mb-1.5">
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3.5">
+                    <div className="flex justify-between items-center text-[11px] font-bold uppercase text-zinc-400 mb-1.5">
                       <span>Title</span>
                       <button
                         onClick={() => handleCopy(currentJob.title || currentJob.topic, "title")}
-                        className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                        className="text-zinc-300 hover:text-zinc-300 flex items-center gap-1"
                       >
                         {copiedKey === "title" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                         <span>Copy</span>
@@ -798,32 +833,32 @@ export default function VideoFarmStudio() {
                     <div className="text-xs text-white line-clamp-3">{currentJob.title || currentJob.topic}</div>
                   </div>
 
-                  <div className="bg-black/40 border border-white/5 rounded-xl p-3.5">
-                    <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-400 mb-1.5">
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3.5">
+                    <div className="flex justify-between items-center text-[11px] font-bold uppercase text-zinc-400 mb-1.5">
                       <span>Description</span>
                       <button
                         onClick={() => handleCopy(currentJob.description || "", "desc")}
-                        className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                        className="text-zinc-300 hover:text-zinc-300 flex items-center gap-1"
                       >
                         {copiedKey === "desc" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                         <span>Copy</span>
                       </button>
                     </div>
-                    <div className="text-xs text-slate-300 line-clamp-3">{currentJob.description || "N/A"}</div>
+                    <div className="text-xs text-zinc-200 line-clamp-3">{currentJob.description || "N/A"}</div>
                   </div>
 
-                  <div className="bg-black/40 border border-white/5 rounded-xl p-3.5">
-                    <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-400 mb-1.5">
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3.5">
+                    <div className="flex justify-between items-center text-[11px] font-bold uppercase text-zinc-400 mb-1.5">
                       <span>Tags</span>
                       <button
                         onClick={() => handleCopy((currentJob.tags || []).join(", "), "tags")}
-                        className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                        className="text-zinc-300 hover:text-zinc-300 flex items-center gap-1"
                       >
                         {copiedKey === "tags" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                         <span>Copy</span>
                       </button>
                     </div>
-                    <div className="text-xs text-slate-300 line-clamp-3">{(currentJob.tags || []).join(", ") || "N/A"}</div>
+                    <div className="text-xs text-zinc-200 line-clamp-3">{(currentJob.tags || []).join(", ") || "N/A"}</div>
                   </div>
                 </div>
               </div>
@@ -837,16 +872,16 @@ export default function VideoFarmStudio() {
           ============================================================ */}
       {activeTab === "storyboard" && storyboard && (
         <section className="max-w-[1200px] w-full mx-auto px-6 py-6 space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
             <div>
-              <h2 className="text-2xl font-black">🎞️ Visual Storyboard & Scene Director</h2>
-              <p className="text-xs text-slate-400">
+              <h2 className="text-2xl font-bold">🎞️ Visual Storyboard & Scene Director</h2>
+              <p className="text-xs text-zinc-400">
                 Customize narration lines, tweak image search queries, and swap scene visuals before compositing.
               </p>
             </div>
             <button
               onClick={() => handleStartRender(true)}
-              className="py-3 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-bold text-xs tracking-wide shadow-lg shadow-purple-600/30 flex items-center gap-2 hover:scale-[1.02] transition-all"
+              className="py-3 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-bold text-xs tracking-wide shadow-sm flex items-center gap-2 hover:scale-[1.02] transition-all"
             >
               <Sparkles className="w-4 h-4" />
               <span>Render Video with This Storyboard</span>
@@ -854,23 +889,23 @@ export default function VideoFarmStudio() {
           </div>
 
           {/* Title & Description Edit */}
-          <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">Suggested Video Title</label>
+              <label className="block text-xs font-bold text-zinc-400 uppercase mb-1.5">Suggested Video Title</label>
               <input
                 type="text"
                 value={storyboard.title}
                 onChange={(e) => setStoryboard({ ...storyboard, title: e.target.value })}
-                className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs text-white"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-white"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">SEO Description</label>
+              <label className="block text-xs font-bold text-zinc-400 uppercase mb-1.5">SEO Description</label>
               <input
                 type="text"
                 value={storyboard.description}
                 onChange={(e) => setStoryboard({ ...storyboard, description: e.target.value })}
-                className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs text-white"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-white"
               />
             </div>
           </div>
@@ -878,9 +913,9 @@ export default function VideoFarmStudio() {
           {/* Scene Cards */}
           <div className="space-y-4">
             {storyboard.scenes.map((sc, idx) => (
-              <div key={idx} className="bg-slate-900/60 border border-white/10 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-5 items-center">
+              <div key={idx} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-5 items-center">
                 {/* Visual Thumbnail */}
-                <div className={`relative bg-black rounded-xl overflow-hidden border border-white/10 ${aspectFormat === "short" ? "aspect-[9/16] max-h-52" : "aspect-video"}`}>
+                <div className={`relative bg-zinc-950 rounded-xl overflow-hidden border border-zinc-800 ${aspectFormat === "short" ? "aspect-[9/16] max-h-52" : "aspect-video"}`}>
                   <img
                     src={sc.preview_image || "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&h=250&fit=crop"}
                     alt={`Scene ${idx + 1}`}
@@ -888,7 +923,7 @@ export default function VideoFarmStudio() {
                   />
                   <button
                     onClick={() => handleRegenerateSceneVisual(idx)}
-                    className="absolute bottom-2 right-2 bg-black/80 hover:bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded-md backdrop-blur-md border border-white/20 transition-all flex items-center gap-1"
+                    className="absolute bottom-2 right-2 bg-zinc-950/80 hover:bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-md backdrop-blur-md border border-zinc-800 transition-all flex items-center gap-1"
                   >
                     <RefreshCw className="w-3 h-3" />
                     <span>Swap</span>
@@ -898,16 +933,16 @@ export default function VideoFarmStudio() {
                 {/* Narration & Prompts */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-cyan-400 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
                       🎬 Scene {sc.scene_id || idx + 1}
                     </span>
-                    <span className="text-[11px] text-slate-400 font-mono">
+                    <span className="text-[11px] text-zinc-400 font-mono">
                       ~{Math.max(4, Math.round((sc.narration || "").split(" ").length / 2.5))}s spoken
                     </span>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">
+                    <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">
                       Narration Voiceover (Spoken Script)
                     </label>
                     <textarea
@@ -918,13 +953,13 @@ export default function VideoFarmStudio() {
                         updated[idx].narration = e.target.value;
                         setStoryboard({ ...storyboard, scenes: updated });
                       }}
-                      className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs text-white leading-relaxed"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-white leading-relaxed"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Visual Keywords</label>
+                      <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">Visual Keywords</label>
                       <input
                         type="text"
                         value={sc.search_query || ""}
@@ -933,11 +968,11 @@ export default function VideoFarmStudio() {
                           updated[idx].search_query = e.target.value;
                           setStoryboard({ ...storyboard, scenes: updated });
                         }}
-                        className="w-full bg-black/60 border border-white/10 rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-xs text-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">AI Prompt</label>
+                      <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">AI Prompt</label>
                       <input
                         type="text"
                         value={sc.image_prompt || ""}
@@ -946,7 +981,7 @@ export default function VideoFarmStudio() {
                           updated[idx].image_prompt = e.target.value;
                           setStoryboard({ ...storyboard, scenes: updated });
                         }}
-                        className="w-full bg-black/60 border border-white/10 rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-xs text-white"
                       />
                     </div>
                   </div>
@@ -962,14 +997,14 @@ export default function VideoFarmStudio() {
           ============================================================ */}
       {activeTab === "gallery" && (
         <section className="max-w-[1400px] w-full mx-auto px-6 py-6 space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
             <div>
-              <h2 className="text-2xl font-black">📁 Video Archive & Vault</h2>
-              <p className="text-xs text-slate-400">All MP4 videos rendered and stored locally on your machine.</p>
+              <h2 className="text-2xl font-bold">📁 Video Archive & Vault</h2>
+              <p className="text-xs text-zinc-400">All MP4 videos rendered and stored locally on your machine.</p>
             </div>
             <button
               onClick={fetchGallery}
-              className="py-2 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 transition-all"
+              className="py-2 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-zinc-800 text-xs font-bold text-white flex items-center gap-1.5 transition-all"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Refresh Vault</span>
@@ -978,14 +1013,14 @@ export default function VideoFarmStudio() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {jobs.map((j) => (
-              <div key={j.job_id} className="bg-slate-900/60 border border-white/10 rounded-2xl overflow-hidden shadow-xl hover:border-purple-500/50 transition-all flex flex-col">
-                <div className={`bg-black ${j.format === "short" ? "aspect-[9/16] max-h-[380px]" : "aspect-video"}`}>
+              <div key={j.job_id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl hover:border-indigo-500/50 transition-all flex flex-col">
+                <div className={`bg-zinc-950 ${j.format === "short" ? "aspect-[9/16] max-h-[380px]" : "aspect-video"}`}>
                   <video src={j.video_url} controls className="w-full h-full object-cover" />
                 </div>
                 <div className="p-4 flex-1 flex flex-col justify-between">
                   <div>
                     <h4 className="font-bold text-sm text-white truncate mb-1">{j.title || j.topic}</h4>
-                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mb-3">
+                    <div className="flex items-center gap-2 text-[11px] text-zinc-400 mb-3">
                       <span>{j.format === "short" ? "📱 9:16 Short" : "🖥️ 16:9 Cinema"}</span>
                       <span>•</span>
                       <span>{j.file_size_mb || "2"} MB</span>
@@ -996,7 +1031,7 @@ export default function VideoFarmStudio() {
                   <a
                     href={j.video_url}
                     download="video.mp4"
-                    className="w-full py-2 rounded-xl bg-white/5 hover:bg-purple-600 text-white text-xs font-bold text-center border border-white/10 transition-all flex items-center justify-center gap-1.5"
+                    className="w-full py-2 rounded-xl bg-white/5 hover:bg-indigo-600 text-white text-xs font-bold text-center border border-zinc-800 transition-all flex items-center justify-center gap-1.5"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Download MP4</span>
@@ -1013,24 +1048,24 @@ export default function VideoFarmStudio() {
           ============================================================ */}
       {activeTab === "monetization" && (
         <section className="max-w-[1000px] w-full mx-auto px-6 py-6">
-          <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-8 shadow-2xl space-y-6 leading-relaxed">
-            <h2 className="text-2xl font-black text-white">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-xl space-y-6 leading-relaxed">
+            <h2 className="text-2xl font-bold text-white">
               💡 How Channel Farm Works & How to Monetize Your Platform
             </h2>
 
-            <div className="space-y-4 text-xs text-slate-300">
-              <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">1. The Faceless YouTube Business Model</h3>
+            <div className="space-y-4 text-xs text-zinc-200">
+              <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">1. The Faceless YouTube Business Model</h3>
               <p>
                 Platforms like <strong>Channel Farm</strong> cater to creators who publish high-volume faceless documentaries across YouTube, TikTok, and Instagram Reels.
               </p>
-              <ul className="list-disc pl-5 space-y-1.5 text-slate-400">
+              <ul className="list-disc pl-5 space-y-1.5 text-zinc-400">
                 <li><strong>Channel Farm Pricing:</strong> $49/mo (approx. 6 videos) up to $699/mo (for 20 channels).</li>
                 <li><strong>High-RPM Niches:</strong> Ancient History, Space Science, Tech, and Finance make <strong>$6 – $20 per 1,000 views</strong> on YouTube AdSense.</li>
                 <li><strong>Compute Cost:</strong> Groq + Edge-TTS + local FFmpeg costs <strong>less than $0.20 per video</strong>, leaving <strong>85%+ gross profit margins</strong>.</li>
               </ul>
 
-              <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wider pt-4">2. The Two Monetization Pathways for You</h3>
-              <ol className="list-decimal pl-5 space-y-2 text-slate-400">
+              <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider pt-4">2. The Two Monetization Pathways for You</h3>
+              <ol className="list-decimal pl-5 space-y-2 text-zinc-400">
                 <li>
                   <strong className="text-white">Run Your Own Automated Channels:</strong> Publish 1 video per day in niches like Ancient Mysteries or Space. A channel doing 500k monthly views earns <strong>$3,000 – $8,000/month</strong> purely from AdSense.
                 </li>
@@ -1048,18 +1083,18 @@ export default function VideoFarmStudio() {
           ============================================================ */}
       {activeTab === "settings" && (
         <section className="max-w-[700px] w-full mx-auto px-6 py-6">
-          <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-8 shadow-2xl space-y-6">
-            <h2 className="text-xl font-black text-white">⚙️ Studio System Configuration</h2>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-xl space-y-6">
+            <h2 className="text-xl font-bold text-white">⚙️ Studio System Configuration</h2>
 
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Groq API Key</label>
+              <label className="block text-xs font-bold text-zinc-400 uppercase mb-2">Groq API Key</label>
               <div className="flex gap-2">
                 <input
                   type="password"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   placeholder="gsk_..."
-                  className="flex-1 bg-black/60 border border-white/10 rounded-xl py-2.5 px-4 text-xs text-white"
+                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl py-2.5 px-4 text-xs text-white"
                 />
                 <button
                   onClick={async () => {
@@ -1075,20 +1110,67 @@ export default function VideoFarmStudio() {
                       setApiKeyInput("");
                     }
                   }}
-                  className="py-2.5 px-5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs"
+                  className="py-2.5 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-600 text-white font-bold text-xs"
                 >
                   Save Key
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">
+              <p className="text-[11px] text-zinc-400 mt-2">
                 Your key is securely saved to <code>.env</code> on your local system.
               </p>
             </div>
 
-            <div className="bg-black/40 border border-white/5 rounded-xl p-4 text-xs text-slate-400 space-y-1 font-mono">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-xs text-zinc-400 space-y-1 font-mono">
               <div>Next.js Frontend: Port 3000 (React 19 / App Router)</div>
               <div>FastAPI Engine: Port 8000 (Python 3.14)</div>
               <div>FFmpeg Binary: /opt/homebrew/bin/ffmpeg</div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ============================================================
+          TAB 6: YOUTUBE CLIPPER
+          ============================================================ */}
+      {activeTab === "clipper" && (
+        <section className="max-w-[800px] w-full mx-auto px-6 py-12">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-xl flex flex-col gap-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/20">
+                <Scissors className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">YouTube AI Clipper</h2>
+              <p className="text-sm text-zinc-400 mt-2">
+                Paste a YouTube URL to automatically find the most engaging moments, transcribe, and convert into a 9:16 Short.
+              </p>
+            </div>
+            
+            <div className="mt-4">
+              <label className="block text-xs font-bold text-zinc-400 uppercase mb-2">YouTube URL</label>
+              <input
+                type="text"
+                value={clipperUrl}
+                onChange={(e) => setClipperUrl(e.target.value)}
+                placeholder="https://youtube.com/watch?v=..."
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            
+            <button
+              disabled={isRendering}
+              onClick={handleClipYouTube}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-red-600 to-purple-600 hover:from-red-500 hover:to-purple-500 text-white font-bold text-sm tracking-wide shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 mt-2"
+            >
+              <Scissors className="w-5 h-5" />
+              <span>Generate Viral Clip</span>
+            </button>
+            
+            <div className="bg-white/5 border border-zinc-800 p-4 rounded-xl text-xs text-zinc-400 leading-relaxed mt-4 space-y-1">
+              <strong className="text-white block mb-2 text-sm">How it works:</strong>
+              <div><span className="text-indigo-400 font-mono pr-2">01</span> Downloads the highest quality YouTube video & audio.</div>
+              <div><span className="text-indigo-400 font-mono pr-2">02</span> Transcribes spoken words using local Whisper AI.</div>
+              <div><span className="text-indigo-400 font-mono pr-2">03</span> Analyzes transcripts with Groq Llama 3 to find a 30-60s engaging hook.</div>
+              <div><span className="text-indigo-400 font-mono pr-2">04</span> Crops the video to 9:16 vertical format (ready for TikTok / Shorts).</div>
             </div>
           </div>
         </section>

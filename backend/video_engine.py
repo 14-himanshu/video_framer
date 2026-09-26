@@ -79,7 +79,7 @@ def generate_script_ai(
     pacing_guide = "1-2 short, high-energy, rapid-fire sentences per scene (ideal for a 30-45s vertical reel)" if is_short else "2-3 intriguing, documentary-style narrative sentences with dramatic depth"
 
     if groq_key:
-        models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile"]
+        models_to_try = ["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
         headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
         
         prompt = f"""You are an elite video creator who produces viral YouTube and social media documentaries.

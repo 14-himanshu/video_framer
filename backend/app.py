@@ -20,8 +20,10 @@ if str(_BACKEND_DIR) not in sys.path:
 
 try:
     import video_engine
+    from youtube_clipper import YouTubeClipper
 except ImportError:
     from backend import video_engine
+    from backend.youtube_clipper import YouTubeClipper
 
 app = FastAPI(title="VideoFarm AI Studio", version="1.0.0")
 
@@ -97,6 +99,10 @@ class VideoRenderRequest(BaseModel):
 
 class KeyUpdateRequest(BaseModel):
     groq_api_key: str
+
+
+class YouTubeClipRequest(BaseModel):
+    url: str
 
 
 def run_pipeline_worker(job_id: str, request_data: VideoRenderRequest):
@@ -238,6 +244,73 @@ async def api_render_video(req: VideoRenderRequest, background_tasks: Background
 
     # Start background execution thread
     thread = Thread(target=run_pipeline_worker, args=(job_id, req), daemon=True)
+    thread.start()
+
+    return {"success": True, "job_id": job_id, "status": "queued"}
+
+def run_clipper_worker(job_id: str, request_data: YouTubeClipRequest):
+    def update_log(msg: str, percent: int, step: str):
+        if job_id in JOBS:
+            JOBS[job_id]["progress"] = percent
+            JOBS[job_id]["step"] = step
+            timestamp = time.strftime("%H:%M:%S")
+            JOBS[job_id]["logs"].append(f"[{timestamp}] {msg}")
+
+    try:
+        JOBS[job_id]["status"] = "processing"
+        update_log("Initializing YouTube Clipper...", 10, "Downloading")
+        
+        clipper = YouTubeClipper(OUTPUT_DIR / job_id)
+        
+        # Override print to capture logs
+        class LogCapturer:
+            def write(self, msg):
+                if msg.strip():
+                    update_log(msg.strip(), 50, "Processing")
+            def flush(self): pass
+        
+        old_stdout = sys.stdout
+        sys.stdout = LogCapturer()
+        try:
+            result = clipper.process(request_data.url)
+        finally:
+            sys.stdout = old_stdout
+            
+        if result.get("status") == "success":
+            JOBS[job_id]["status"] = "completed"
+            JOBS[job_id]["progress"] = 100
+            JOBS[job_id]["step"] = "Completed"
+            JOBS[job_id]["video_url"] = f"/output/{job_id}/{result.get('file_name')}"
+            JOBS[job_id]["title"] = result.get("title", "YouTube Clip")
+            JOBS[job_id]["description"] = result.get("reasoning", "")
+        else:
+            raise Exception(result.get("message", "Unknown error"))
+    except Exception as e:
+        timestamp = time.strftime("%H:%M:%S")
+        JOBS[job_id]["status"] = "failed"
+        JOBS[job_id]["step"] = "Error"
+        JOBS[job_id]["error"] = str(e)
+        JOBS[job_id]["logs"].append(f"[{timestamp}] [ERROR]: {str(e)}")
+        print(f"[Clipper Worker Error in {job_id}]: {e}")
+
+@app.post("/api/clip-youtube")
+async def api_clip_youtube(req: YouTubeClipRequest, background_tasks: BackgroundTasks):
+    if not req.url.strip():
+        raise HTTPException(status_code=400, detail="URL cannot be empty")
+
+    job_id = f"clip_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    JOBS[job_id] = {
+        "job_id": job_id,
+        "url": req.url,
+        "status": "queued",
+        "progress": 0,
+        "step": "Queued",
+        "logs": [f"[{time.strftime('%H:%M:%S')}] Job registered in queue"],
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    # Start background execution thread
+    thread = Thread(target=run_clipper_worker, args=(job_id, req), daemon=True)
     thread.start()
 
     return {"success": True, "job_id": job_id, "status": "queued"}
