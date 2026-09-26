@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VideoFarm AI Studio | Zero-Cost Automated Video Generator</title>
+  <meta name="description" content="Professional automated video generation platform. Turn any topic into documentary-style long-form videos or viral vertical shorts with AI scripts, neural voiceovers, captions, and Ken Burns motion effects.">
+  
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Top App Navigation Bar -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-badge-logo">🎬</div>
+      <div class="brand-text">
+        <h1>VideoFarm AI Studio</h1>
+        <p><span>Pro Faceless Video Pipeline</span> • <span style="color: var(--accent-cyan);">Zero Cost Architecture</span></p>
+      </div>
+    </div>
+
+    <!-- Mode Navigation Tabs -->
+    <nav class="header-nav">
+      <button class="nav-tab-btn active" id="tab-btn-studio" onclick="switchNavTab('studio')">
+        🎬 Studio Canvas
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-storyboard" onclick="openStoryboardTab()">
+        🎞️ Storyboard Editor
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-gallery" onclick="switchNavTab('gallery')">
+        📁 Archive <span id="gallery-count-badge" style="background: rgba(255,255,255,0.15); font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 9999px;">0</span>
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-monetization" onclick="switchNavTab('monetization')">
+        💡 Monetization & Architecture
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-settings" onclick="switchNavTab('settings')">
+        ⚙️ Settings
+      </button>
+    </nav>
+
+    <!-- Health & Status -->
+    <div class="header-status-group">
+      <div class="engine-pill">
+        <span class="pulsing-dot"></span>
+        <span id="engine-status-label">Groq & Edge-TTS Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       TAB 1: STUDIO CANVAS WORKSTATION
+       ============================================================ -->
+  <main id="nav-studio" class="studio-workstation active-tab">
+
+    <!-- Left Column: Director's Deck -->
+    <aside class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">🎛️ Director's Control Deck</h2>
+        <span class="panel-tag">AI Pipeline</span>
+      </div>
+
+      <!-- 1. Topic & Niche Selection -->
+      <div class="section-block">
+        <div class="section-label">
+          <span>Documentary Topic or Concept</span>
+          <span class="section-hint">Be specific for richer scripts</span>
+        </div>
+        <div class="topic-search-wrap">
+          <span class="topic-icon">💡</span>
+          <input type="text" id="topic-input" class="topic-input" placeholder="e.g., The Secret of Roman Concrete..." value="The Secrets of Black Holes">
+        </div>
+
+        <!-- Curated Viral Niche Inspiration Pills -->
+        <div class="niche-pills">
+          <button class="niche-pill" onclick="applyPresetTopic('The Secrets of Black Holes')">🌌 Black Holes</button>
+          <button class="niche-pill" onclick="applyPresetTopic('Why Did the Roman Empire Collapse')">🏛️ Fall of Rome</button>
+          <button class="niche-pill" onclick="applyPresetTopic('The Ancient Pyramids of Giza')">⏳ Giza Pyramids</button>
+          <button class="niche-pill" onclick="applyPresetTopic('The James Webb Telescope Discoveries')">🔭 James Webb</button>
+          <button class="niche-pill" onclick="applyPresetTopic('The 1% Psychology of Money')">💰 Money Psychology</button>
+          <button class="niche-pill" onclick="applyPresetTopic('What Lurks in the Deep Ocean Trench')">🐙 Deep Sea Trench</button>
+        </div>
+      </div>
+
+      <!-- 2. Video Format & Aspect Ratio Selector -->
+      <div class="section-block">
+        <div class="section-label">
+          <span>Target Platform & Aspect Ratio</span>
+        </div>
+        <div class="aspect-selector-grid">
+          <div id="format-card-long" class="aspect-option-card selected" onclick="changeAspectFormat('long')">
+            <div class="aspect-preview-box">🖥️</div>
+            <div class="aspect-text">
+              <h4>16:9 Landscape</h4>
+              <p>YouTube Long-form documentary (1280x720)</p>
+            </div>
+          </div>
+
+          <div id="format-card-short" class="aspect-option-card" onclick="changeAspectFormat('short')">
+            <div class="aspect-preview-box">📱</div>
+            <div class="aspect-text">
+              <h4>9:16 Vertical</h4>
+              <p>Shorts, Reels, TikTok (720x1280)</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Interactive Voice Matrix (With Audio Preview!) -->
+      <div class="section-block">
+        <div class="section-label">
+          <span>Narrator Voice Cast</span>
+          <span class="section-hint">Click ▶ to hear preview</span>
+        </div>
+        <div id="voice-matrix-grid" class="voice-matrix">
+          <!-- Dynamically populated voice cards with audio preview buttons -->
+        </div>
+      </div>
+
+      <!-- 4. Creative Visuals & Scene Count -->
+      <div class="section-block">
+        <div class="section-label">
+          <span>Visual Sourcing Engine</span>
+        </div>
+        <select id="visual-engine-select" class="topic-input" style="padding-left: 1rem;">
+          <option value="auto" selected>🌐 Real-Time Web Topic Search (DuckDuckGo + Wikipedia HD - 100% Relevant)</option>
+          <option value="ai">🎨 AI Art Generation (Pollinations Turbo with Web Fallback)</option>
+          <option value="wikimedia">🏛️ Historical Public Domain Archives (Openverse & Wikipedia)</option>
+        </select>
+      </div>
+
+      <div class="section-block">
+        <div class="section-label">
+          <span>Scene Pacing & Duration</span>
+          <span id="scene-slider-badge" class="slider-val-badge">3 Scenes (~30s)</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="scenes-range" min="3" max="6" value="3" class="range-slider" oninput="handleSceneSliderChange(this.value)">
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="studio-actions-group">
+        <button id="btn-start-render" class="btn btn-primary" onclick="launchVideoGeneration(false)">
+          ⚡ 1-Click Fast Render
+        </button>
+        <button id="btn-open-storyboard" class="btn btn-secondary" onclick="prepareStoryboardPreview()">
+          📝 Edit Script First
+        </button>
+      </div>
+    </aside>
+
+    <!-- Right Column: Studio Monitor & Canvas -->
+    <section class="studio-canvas">
+
+      <!-- Cinema Monitor -->
+      <div class="cinema-monitor">
+        <div id="cinema-screen" class="cinema-screen-wrap aspect-16-9">
+
+          <!-- Standby Empty State -->
+          <div id="cinema-standby-view" class="standby-state">
+            <div class="standby-radar">🎬</div>
+            <h3>Cinema Monitor Standby</h3>
+            <p>Select your topic, choose an aspect ratio, and click <strong>1-Click Fast Render</strong> to synthesize a complete narrated video with animated motion graphics.</p>
+            
+            <div class="standby-stats-grid">
+              <div class="standby-stat-box">
+                <div class="stat-box-title">Render Speed</div>
+                <div class="stat-box-val">~30 sec</div>
+              </div>
+              <div class="standby-stat-box">
+                <div class="stat-box-title">Production Cost</div>
+                <div class="stat-box-val" style="color: var(--accent-emerald);">$0.00</div>
+              </div>
+              <div class="standby-stat-box">
+                <div class="stat-box-title">Video Quality</div>
+                <div class="stat-box-val">HD 30 FPS</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Player (Revealed upon render completion) -->
+          <video id="cinema-player" class="cinema-video-player" controls style="display: none;"></video>
+        </div>
+      </div>
+
+      <!-- Live Multi-Track Studio Pipeline (Shown during render) -->
+      <div id="live-pipeline-box" class="live-studio-pipeline">
+        <div class="pipeline-top-bar">
+          <div class="pipeline-status-text">
+            <span class="pulsing-dot" style="background: var(--accent-cyan); box-shadow: 0 0 10px var(--accent-cyan);"></span>
+            <span id="pipeline-status-msg">Initiating Video Compositing...</span>
+          </div>
+          <span id="pipeline-percentage" class="pipeline-pct-badge">0%</span>
+        </div>
+
+        <!-- 4 Multi-Track Timeline Bars -->
+        <div class="studio-tracks">
+          <div class="track-item">
+            <div class="track-icon">🎙️</div>
+            <div class="track-info">
+              <div class="track-name">
+                <span>Neural Speech & Word-Aligned Subtitles</span>
+                <span id="track-speech-status" style="font-size: 0.72rem; color: var(--accent-cyan);">Active</span>
+              </div>
+              <div class="track-progress-bar">
+                <div id="track-speech-fill" class="track-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="track-item">
+            <div class="track-icon">🎨</div>
+            <div class="track-info">
+              <div class="track-name">
+                <span>Real-Time Topic Visual Sourcing</span>
+                <span id="track-visual-status" style="font-size: 0.72rem; color: var(--text-muted);">Queued</span>
+              </div>
+              <div class="track-progress-bar">
+                <div id="track-visual-fill" class="track-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="track-item">
+            <div class="track-icon">🎞️</div>
+            <div class="track-info">
+              <div class="track-name">
+                <span>Ken Burns Pan/Zoom & Caption Rendering</span>
+                <span id="track-render-status" style="font-size: 0.72rem; color: var(--text-muted);">Queued</span>
+              </div>
+              <div class="track-progress-bar">
+                <div id="track-render-fill" class="track-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Terminal Dock -->
+        <div id="live-terminal-dock" class="terminal-dock">
+          <div class="log-line">[Engine Ready] Studio workstation initialized.</div>
+        </div>
+      </div>
+
+      <!-- YouTube & Social Media Launchpad (Shown when video is ready) -->
+      <div id="export-launchpad-box" class="export-launchpad">
+        <div class="launchpad-header">
+          <div>
+            <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff;">🚀 YouTube & Social Media Launchpad</h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted);">Your video is ready for upload. Copy pre-optimized metadata below.</p>
+          </div>
+          <a id="launchpad-download-btn" href="#" download="documentary.mp4" class="btn btn-primary" style="padding: 0.65rem 1.25rem; font-size: 0.85rem;">
+            ⬇️ Download MP4 Video
+          </a>
+        </div>
+
+        <div class="launchpad-meta-grid">
+          <div class="meta-field-card">
+            <div class="meta-field-top">
+              <span>Viral Video Title</span>
+              <button class="copy-pill-btn" onclick="copyLaunchpadText('meta-title-text')">Copy</button>
+            </div>
+            <div id="meta-title-text" class="meta-field-content"></div>
+          </div>
+
+          <div class="meta-field-card">
+            <div class="meta-field-top">
+              <span>SEO Description</span>
+              <button class="copy-pill-btn" onclick="copyLaunchpadText('meta-desc-text')">Copy</button>
+            </div>
+            <div id="meta-desc-text" class="meta-field-content"></div>
+          </div>
+
+          <div class="meta-field-card">
+            <div class="meta-field-top">
+              <span>Optimized Tags</span>
+              <button class="copy-pill-btn" onclick="copyLaunchpadText('meta-tags-text')">Copy</button>
+            </div>
+            <div id="meta-tags-text" class="meta-field-content"></div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       TAB 2: VISUAL STORYBOARD & SCRIPT EDITOR (FULL WORKSPACE)
+       ============================================================ -->
+  <section id="nav-storyboard" class="gallery-workstation" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+      <div>
+        <h2 style="font-size: 1.75rem; font-weight: 800;">🎞️ Visual Storyboard & Script Editor</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Review each scene, edit the narration speech, or fine-tune image search terms before rendering.</p>
+      </div>
+      <button class="btn btn-primary" onclick="launchVideoGeneration(true)">
+        🚀 Render Video from Storyboard
+      </button>
+    </div>
+
+    <!-- Script Overview Meta -->
+    <div class="panel" style="margin-bottom: 1.5rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label class="section-label">Suggested Video Title</label>
+          <input type="text" id="storyboard-title" class="topic-input" style="padding-left: 1rem;">
+        </div>
+        <div>
+          <label class="section-label">SEO Description</label>
+          <input type="text" id="storyboard-desc" class="topic-input" style="padding-left: 1rem;">
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene Timeline Cards List -->
+    <div id="storyboard-scenes-container">
+      <!-- Injected via JavaScript -->
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TAB 3: VIDEO ARCHIVE & LIBRARY
+       ============================================================ -->
+  <section id="nav-gallery" class="gallery-workstation" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+      <div>
+        <h2 style="font-size: 1.75rem; font-weight: 800;">📁 Video Archive & Library</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Browse, preview, and export all generated videos saved locally.</p>
+      </div>
+      <button class="btn btn-secondary" onclick="fetchGalleryArchive()">🔄 Refresh Library</button>
+    </div>
+
+    <div id="gallery-cards-grid" class="gallery-grid">
+      <!-- Injected via JavaScript -->
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TAB 4: MONETIZATION & ARCHITECTURE GUIDE
+       ============================================================ -->
+  <section id="nav-monetization" class="gallery-workstation" style="display: none;">
+    <div class="panel" style="max-width: 1050px; margin: 0 auto; line-height: 1.7;">
+      <h2 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 1rem; color: #fff;">
+        💡 How Channel Farm Works & How to Monetize Your Platform
+      </h2>
+      
+      <div style="color: var(--text-secondary);">
+        <h3 style="color: var(--accent-cyan); margin: 1.5rem 0 0.5rem;">1. What is the Core Business Model?</h3>
+        <p>
+          Web services like <strong>Channel Farm</strong> cater to the multi-billion dollar "faceless YouTube" and automated content industry. Creators publish documentaries and vertical reels without ever filming themselves or hiring expensive voiceover artists and video editors.
+        </p>
+        <ul style="margin: 0.8rem 0 1.2rem 1.5rem;">
+          <li><strong>Channel Farm charges:</strong> $49/mo (approx. 6 videos) up to $699/mo (for 20 channels).</li>
+          <li><strong>High-paying niches:</strong> Ancient History, Space, Tech, Psychology, and Finance can generate <strong>$5 to $25 per 1,000 views (RPM)</strong> from YouTube AdSense.</li>
+          <li><strong>True Compute Cost:</strong> By leveraging Groq's high-speed API, Microsoft Edge Neural TTS, and local FFmpeg, generating a 10-minute 1080p video costs <strong>less than $0.20 in server compute</strong>, yielding an <strong>85%+ gross profit margin</strong>.</li>
+        </ul>
+
+        <h3 style="color: var(--accent-cyan); margin: 1.5rem 0 0.5rem;">2. Production Open-Source Tech Stack</h3>
+        <ul style="margin: 0.8rem 0 1.2rem 1.5rem;">
+          <li><strong>AI Scriptwriting:</strong> Groq API (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, Llama 3.3) formats structured JSON scene breakdowns with viral hooks.</li>
+          <li><strong>Neural Voiceover:</strong> `edge-tts` provides human-grade narration in dozens of accents at $0 cost with precise word-level subtitle alignment.</li>
+          <li><strong>Dynamic Visual Sourcing:</strong> DuckDuckGo Real-Time Image Search + Wikipedia HD REST API ensures every single scene gets authentic, topic-specific visuals.</li>
+          <li><strong>Video Engine:</strong> FFmpeg hardware-accelerated pipeline applies the Ken Burns slow zoom motion, mixes audio, burns outline subtitles, and concatenates scenes.</li>
+        </ul>
+
+        <h3 style="color: var(--accent-cyan); margin: 1.5rem 0 0.5rem;">3. Monetization Pathways for You:</h3>
+        <ol style="margin: 0.8rem 0 1.2rem 1.5rem;">
+          <li><strong>Build a Faceless YouTube Empire:</strong> Generate 1 video daily in high-CPM niches (Ancient History, Space, Wealth). At 500k monthly views, AdSense pays <strong>$2,500 – $8,000/month</strong>.</li>
+          <li><strong>Sell Access as a SaaS Platform:</strong> Connect Supabase Authentication and Stripe payments in front of this FastAPI backend, deploy it to a $5–$10/mo VPS or Railway, and market to content creators on TikTok, Twitter, and Reddit.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TAB 5: SETTINGS & SYSTEM CONFIGURATION
+       ============================================================ -->
+  <section id="nav-settings" class="gallery-workstation" style="display: none;">
+    <div class="panel" style="max-width: 750px; margin: 0 auto;">
+      <div class="panel-header">
+        <h2 class="panel-title">⚙️ System Configuration</h2>
+        <span class="panel-tag">Environment</span>
+      </div>
+
+      <div class="section-block">
+        <div class="section-label">
+          <span>Groq API Key</span>
+          <span id="settings-key-status" class="section-hint" style="color: var(--accent-emerald);">✓ Active in .env</span>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <input type="password" id="input-groq-key" class="topic-input" placeholder="gsk_...">
+          <button class="btn btn-primary" onclick="submitGroqKeyUpdate()">Save Key</button>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;">
+          Your key is securely stored in <code>.env</code> and excluded from version control via <code>.gitignore</code>.
+        </p>
+      </div>
+
+      <div class="section-block" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1.25rem;">
+        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.6rem;">Diagnostic Telemetry:</h4>
+        <p style="font-size: 0.78rem; color: var(--text-muted);">Python Virtualenv: <code>/Users/himanshupandey/Desktop/video_farm/.venv</code></p>
+        <p style="font-size: 0.78rem; color: var(--text-muted);">FFmpeg Binary: <code>/opt/homebrew/bin/ffmpeg</code></p>
+        <p style="font-size: 0.78rem; color: var(--text-muted);">Local Storage Vault: <code>/Users/himanshupandey/Desktop/video_farm/output</code></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Toast Notification Shelf -->
+  <div id="toast-shelf" class="toast-shelf"></div>
+
+  <!-- Audio Player for Voice Previews (Invisible) -->
+  <audio id="global-preview-audio" preload="none"></audio>
+
+  <!-- Client Application Logic -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
