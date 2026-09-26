@@ -33,3 +33,8 @@ uvloop==0.22.1
 watchfiles==1.3.0
 websockets==17.1
 yarl==1.25.1
+
+yt-dlp
+ffmpeg-python
+groq
+faster-whisper
