@@ -27,20 +27,19 @@ from typing import Callable, Optional
 from dotenv import load_dotenv
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-
-# Auto-discover key from project root .env if not set
-if not GROQ_API_KEY or GROQ_API_KEY.startswith("gsk_your_"):
-    _root = Path(__file__).resolve().parent.parent
-    for _cand in [_root / ".env", Path(__file__).resolve().parent / ".env"]:
-        if _cand.exists():
-            for _line in _cand.read_text().splitlines():
-                if _line.startswith("GROQ_API_KEY="):
-                    _v = _line.split("=", 1)[1].strip().strip('"').strip("'")
-                    if _v and not _v.startswith("gsk_your_"):
-                        GROQ_API_KEY = _v
-                        os.environ["GROQ_API_KEY"] = _v
-                        break
+def get_groq_api_key() -> str:
+    key = os.environ.get("GROQ_API_KEY", "")
+    if not key or key.startswith("gsk_your_"):
+        _root = Path(__file__).resolve().parent.parent
+        for _cand in [_root / ".env", Path(__file__).resolve().parent / ".env"]:
+            if _cand.exists():
+                for _line in _cand.read_text(encoding="utf-8").splitlines():
+                    if _line.startswith("GROQ_API_KEY="):
+                        _v = _line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if _v and not _v.startswith("gsk_your_"):
+                            os.environ["GROQ_API_KEY"] = _v
+                            return _v
+    return key
 
 import requests
 
@@ -56,8 +55,9 @@ def download_youtube_video(url: str, output_dir: Path, log_fn: Optional[Callable
         log_fn("Downloading video from YouTube...", 10, "Downloading")
 
     # Download best quality up to 1080p (keeps file size manageable)
+    import sys
     ydl_opts = [
-        "yt-dlp",
+        sys.executable, "-m", "yt_dlp",
         "--format", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
         "--merge-output-format", "mp4",
         "--no-playlist",
@@ -121,7 +121,8 @@ def transcribe_with_groq(audio_path: str, log_fn: Optional[Callable] = None) -> 
     FREE — uses your existing Groq key, 2000 requests/day limit.
     Returns the full Groq response dict with segments + timestamps.
     """
-    if not GROQ_API_KEY or GROQ_API_KEY.startswith("gsk_your_"):
+    key = get_groq_api_key()
+    if not key or key.startswith("gsk_your_"):
         raise RuntimeError("GROQ_API_KEY not configured. Add it to your .env file.")
 
     if log_fn:
@@ -144,7 +145,7 @@ def transcribe_with_groq(audio_path: str, log_fn: Optional[Callable] = None) -> 
     with open(audio_path, "rb") as f:
         response = requests.post(
             "https://api.groq.com/openai/v1/audio/transcriptions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            headers={"Authorization": f"Bearer {key}"},
             files={"file": (Path(audio_path).name, f, "audio/mpeg")},
             data={
                 "model": "whisper-large-v3-turbo",
@@ -218,7 +219,7 @@ TRANSCRIPT WITH TIMESTAMPS:
             response = requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Authorization": f"Bearer {get_groq_api_key()}",
                     "Content-Type": "application/json"
                 },
                 json={
