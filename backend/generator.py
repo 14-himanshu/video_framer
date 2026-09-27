@@ -130,81 +130,156 @@ def get_audio_duration(audio_path: Path) -> float:
     return float(result.stdout.strip())
 
 
+def _download_image(url: str, output_path: Path, min_size: int = 15000) -> bool:
+    """Helper: download an image URL and save if it meets minimum size. Returns True on success."""
+    try:
+        headers = {
+            "User-Agent": "VideoFarmBot/1.0 (https://github.com/videofarm; educational use)",
+            "Accept": "image/*,*/*",
+        }
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as res:
+            data = res.read()
+        if len(data) > min_size:
+            with open(output_path, "wb") as f:
+                f.write(data)
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def fetch_scene_image(query: str, output_path: Path, scene_index: int = 0):
     """
-    Fetches genuine, topic-specific high-resolution imagery.
-    Uses DuckDuckGo real-time image search + Wikipedia HD REST API.
-    Guarantees every scene gets a different, topic-relevant image.
+    Fetches a high-resolution, topic-relevant image using a 5-source fallback chain.
+    ALL sources are completely FREE with NO API key and NO signup required.
+
+    Source priority:
+      1. Wikimedia Commons API (NO key — millions of high-res, CC-licensed images)
+      2. Wikipedia REST API    (NO key — HD article thumbnails)
+      3. Openverse API         (NO key — Creative Commons photo search)
+      4. Pollinations AI       (NO key — AI-generated image as last resort)
+      5. FFmpeg color block    (local  — absolute fallback, always works)
     """
     clean_q = re.sub(r'[^\w\s-]', ' ', query).strip()
-    print(f" -> Searching topic-specific visual for: '{clean_q}'...")
+    print(f" -> Sourcing visual for: '{clean_q}' (scene {scene_index + 1})...")
 
-    # 1. DuckDuckGo Image Search
+    # ─── Source 1: Wikimedia Commons API (no key required) ───────────────────
+    # Docs: https://commons.wikimedia.org/w/api.php
     try:
-        token_url = f"https://duckduckgo.com/?q={urllib.parse.quote(clean_q)}"
-        req = urllib.request.Request(token_url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
-        with urllib.request.urlopen(req, timeout=5) as res:
-            content = res.read().decode("utf-8", errors="ignore")
-        match = re.search(r"vqd=([\d-]+)", content)
-        if match:
-            vqd = match.group(1)
-            search_url = f"https://duckduckgo.com/i.js?l=us-en&o=json&q={urllib.parse.quote(clean_q)}&vqd={vqd}&f=,,,&p=1"
-            req2 = urllib.request.Request(search_url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
-            with urllib.request.urlopen(req2, timeout=6) as res2:
-                results = json.loads(res2.read().decode("utf-8")).get("results", [])
+        search_url = (
+            "https://commons.wikimedia.org/w/api.php"
+            f"?action=query&list=search&srsearch={urllib.parse.quote(clean_q)}"
+            "&srnamespace=6&srlimit=10&format=json"
+        )
+        req = urllib.request.Request(search_url, headers={"User-Agent": "VideoFarmBot/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as res:
+            results = json.loads(res.read()).get("query", {}).get("search", [])
 
-            start_idx = scene_index % max(1, len(results))
-            candidates = results[start_idx:] + results[:start_idx]
-
-            for r in candidates[:6]:
-                img_url = r.get("image")
-                if not img_url:
-                    continue
-                try:
-                    dl_req = urllib.request.Request(img_url, headers={"User-Agent": "Mozilla/5.0"})
-                    with urllib.request.urlopen(dl_req, timeout=8) as img_res:
-                        data = img_res.read()
-                        if len(data) > 15000:
-                            with open(output_path, "wb") as f:
-                                f.write(data)
-                            print(f" -> Downloaded topic photo: {output_path.name} ({len(data)//1024} KB)")
-                            return
-                except Exception:
-                    continue
+        # Pick a different result per scene to avoid repetition
+        if results:
+            pick = results[scene_index % len(results)]
+            title = pick["title"]  # e.g. "File:Black hole.jpg"
+            # Get the actual file URL via imageinfo API
+            info_url = (
+                "https://commons.wikimedia.org/w/api.php"
+                f"?action=query&titles={urllib.parse.quote(title)}"
+                "&prop=imageinfo&iiprop=url&iiurlwidth=1280&format=json"
+            )
+            req2 = urllib.request.Request(info_url, headers={"User-Agent": "VideoFarmBot/1.0"})
+            with urllib.request.urlopen(req2, timeout=8) as res2:
+                pages = json.loads(res2.read()).get("query", {}).get("pages", {})
+                for page in pages.values():
+                    ii = page.get("imageinfo", [{}])[0]
+                    img_url = ii.get("thumburl") or ii.get("url")
+                    if img_url and _download_image(img_url, output_path):
+                        print(f" -> [Source 1] Wikimedia Commons: {output_path.name}")
+                        return
     except Exception as e:
-        print(f" -> [Search Notice]: {e}")
+        print(f" -> [Wikimedia notice]: {e}")
 
-    # 2. Wikipedia High-Resolution Search
+    # ─── Source 2: Wikipedia REST API (no key required) ──────────────────────
+    # Docs: https://en.wikipedia.org/api/rest_v1/
     try:
-        url = f"https://en.wikipedia.org/w/rest.php/v1/search/page?q={urllib.parse.quote(clean_q)}&limit=5"
+        url = (
+            f"https://en.wikipedia.org/w/rest.php/v1/search/page"
+            f"?q={urllib.parse.quote(clean_q)}&limit=8"
+        )
         req = urllib.request.Request(url, headers={"User-Agent": "VideoFarmBot/1.0"})
-        with urllib.request.urlopen(req, timeout=5) as res:
+        with urllib.request.urlopen(req, timeout=6) as res:
             pages = json.loads(res.read()).get("pages", [])
 
         pages_with_imgs = [p for p in pages if p.get("thumbnail")]
         if pages_with_imgs:
             p = pages_with_imgs[scene_index % len(pages_with_imgs)]
-            thumb = p.get("thumbnail", {}).get("url")
-            if thumb:
-                full_url = "https:" + re.sub(r'/\d+px-', '/1280px-', thumb.split("?")[0])
-                dl_req = urllib.request.Request(full_url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(dl_req, timeout=8) as img_res:
-                    data = img_res.read()
-                    if len(data) > 15000:
-                        with open(output_path, "wb") as f:
-                            f.write(data)
-                        print(f" -> Downloaded Wikipedia HD photo: {output_path.name} ({len(data)//1024} KB)")
-                        return
+            thumb_url = p["thumbnail"].get("url", "")
+            # Upgrade to 1280px wide version
+            hd_url = "https:" + re.sub(r'/\d+px-', '/1280px-', thumb_url.split("?")[0])
+            if _download_image(hd_url, output_path) or _download_image("https:" + thumb_url, output_path):
+                print(f" -> [Source 2] Wikipedia HD: {output_path.name}")
+                return
     except Exception as e:
-        print(f" -> [Wiki Notice]: {e}")
+        print(f" -> [Wikipedia notice]: {e}")
 
-    # 3. Procedural themed image fallback (never repeat same image)
+    # ─── Source 3: Openverse API (no key required for basic search) ──────────
+    # Docs: https://api.openverse.org/v1/
+    try:
+        ov_url = (
+            f"https://api.openverse.org/v1/images/"
+            f"?q={urllib.parse.quote(clean_q)}&page_size=20&license_type=commercial"
+        )
+        req = urllib.request.Request(
+            ov_url,
+            headers={
+                "User-Agent": "VideoFarmBot/1.0",
+                "Accept": "application/json",
+            }
+        )
+        with urllib.request.urlopen(req, timeout=8) as res:
+            results = json.loads(res.read()).get("results", [])
+
+        if results:
+            pick = results[scene_index % len(results)]
+            # Prefer the full URL, fall back to thumbnail
+            img_url = pick.get("url") or pick.get("thumbnail")
+            if img_url and _download_image(img_url, output_path):
+                print(f" -> [Source 3] Openverse (CC): {output_path.name}")
+                return
+    except Exception as e:
+        print(f" -> [Openverse notice]: {e}")
+
+    # ─── Source 4: Pollinations AI (no key, AI-generated) ────────────────────
+    # Docs: https://pollinations.ai/
+    try:
+        # Use a documentary/cinematic style prompt
+        ai_prompt = f"{clean_q} cinematic documentary photograph high resolution 4k"
+        seed = scene_index * 137 + hash(clean_q) % 10000  # different seed per scene
+        poll_url = (
+            f"https://image.pollinations.ai/prompt/{urllib.parse.quote(ai_prompt)}"
+            f"?width=1280&height=720&seed={abs(seed)}&nologo=true"
+        )
+        req = urllib.request.Request(poll_url, headers={"User-Agent": "VideoFarmBot/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as res:  # AI gen takes longer
+            data = res.read()
+        if len(data) > 15000:
+            with open(output_path, "wb") as f:
+                f.write(data)
+            print(f" -> [Source 4] Pollinations AI generated: {output_path.name}")
+            return
+    except Exception as e:
+        print(f" -> [Pollinations notice]: {e}")
+
+    # ─── Source 5: FFmpeg procedural color block (always works, local) ────────
     import hashlib
     h = int(hashlib.md5(f"{clean_q}_{scene_index}".encode()).hexdigest()[:6], 16)
     hex_color = f"0x{(h>>16)&0xFF:02x}{(h>>8)&0xFF:02x}{h&0xFF:02x}"
-    cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c={hex_color}:s=1280x720:d=1", "-vframes", "1", str(output_path.resolve())]
+    cmd = [
+        "ffmpeg", "-y", "-f", "lavfi",
+        "-i", f"color=c={hex_color}:s=1280x720:d=1",
+        "-vframes", "1", str(output_path.resolve())
+    ]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    print(f" -> Procedural backdrop generated: {output_path.name}")
+    print(f" -> [Source 5] Procedural color backdrop: {output_path.name}")
 
 
 def render_scene(image_path: Path, audio_path: Path, srt_path: Path, duration: float, output_path: Path):

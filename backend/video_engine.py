@@ -16,17 +16,17 @@ import edge_tts
 BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent if (BASE_DIR.parent / ".env").exists() or (BASE_DIR.parent / "frontend").exists() else BASE_DIR
 
+_KEY_NAMES = {"GROQ_API_KEY", "GEMINI_API_KEY", "PEXELS_API_KEY"}
 for candidate in [BASE_DIR / ".env", ROOT_DIR / ".env"]:
     if candidate.exists():
         for _line in candidate.read_text(encoding="utf-8").splitlines():
             _line = _line.strip()
-            if _line.startswith("GROQ_API_KEY="):
-                _val = _line.split("=", 1)[1].strip().strip('"').strip("'")
-                if _val and not _val.startswith("gsk_your_"):
-                    os.environ["GROQ_API_KEY"] = _val
-                    break
-        if os.getenv("GROQ_API_KEY"):
-            break
+            if "=" in _line and not _line.startswith("#"):
+                _k, _v = _line.split("=", 1)
+                _k = _k.strip()
+                _v = _v.strip().strip('"').strip("'")
+                if _k in _KEY_NAMES and _v and not _v.startswith("your_") and not _v.startswith("gsk_your_"):
+                    os.environ.setdefault(_k, _v)
 
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(ROOT_DIR / "output")))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -44,7 +44,7 @@ AVAILABLE_VOICES = [
 ]
 
 
-def get_voice_preview_path(voice_id: str) -> Path:
+async def get_voice_preview_path(voice_id: str) -> Path:
     """Generates and caches a voice preview snippet."""
     preview_dir = OUTPUT_DIR / "previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
@@ -63,7 +63,7 @@ def get_voice_preview_path(voice_id: str) -> Path:
         }
         text = sample_texts.get(voice_id, "Welcome to VideoFarm AI Studio. This is how my voice sounds.")
         comm = edge_tts.Communicate(text, voice_id)
-        asyncio.run(comm.save(str(audio_file)))
+        await comm.save(str(audio_file))
     return audio_file
 
 
@@ -78,30 +78,10 @@ def generate_script_ai(
     is_short = (format_type == "short")
     pacing_guide = "1-2 short, high-energy, rapid-fire sentences per scene (ideal for a 30-45s vertical reel)" if is_short else "2-3 intriguing, documentary-style narrative sentences with dramatic depth"
 
+    # ── Groq (primary) ───────────────────────────────────────────────────────
     if groq_key:
-        models_to_try = ["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+        models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant"]
         headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
-        
-        prompt = f"""You are an elite video creator who produces viral YouTube and social media documentaries.
-Write a complete, highly engaging {num_scenes}-scene video package for the topic: "{topic}".
-Video format: {"Short-form 9:16 vertical video (fast-paced, high retention hook)" if is_short else "Long-form 16:9 documentary (cinematic storytelling)"}.
-
-Return ONLY valid JSON matching this exact structure:
-{{
-  "title": "Viral Click-Worthy Title (under 60 chars)",
-  "description": "Engaging 2-sentence video summary with relevant keywords",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "scenes": [
-    {{
-      "scene_id": 1,
-      "narration": "{pacing_guide}",
-      "image_prompt": "Cinematic 8k digital photograph prompt describing the scene visually (e.g. 'Ancient Library of Alexandria with glowing scrolls, grand marble pillars, dramatic sunlight rays, hyper-detailed')",
-      "search_query": "2-3 keywords for photo search (e.g. 'Alexandria Library ancient')"
-    }}
-  ]
-}}
-
-No markdown backticks, no explanatory comments, just raw JSON."""
 
         for model in models_to_try:
             try:
@@ -113,7 +93,6 @@ No markdown backticks, no explanatory comments, just raw JSON."""
                 res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25)
                 if res.status_code == 200:
                     raw_text = res.json()["choices"][0]["message"]["content"].strip()
-                    # Extract JSON object
                     match = re.search(r"\{.*\}", raw_text, re.DOTALL)
                     if match:
                         data = json.loads(match.group(0))
@@ -121,6 +100,31 @@ No markdown backticks, no explanatory comments, just raw JSON."""
                             return data
             except Exception as e:
                 print(f"[AI Script Generation Notice ({model})]: {e}")
+
+    # ── Gemini Flash (automatic free fallback when Groq unavailable) ──────────
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    if gemini_key:
+        try:
+            gemini_url = (
+                f"https://generativelanguage.googleapis.com/v1beta/models/"
+                f"gemini-1.5-flash:generateContent?key={gemini_key}"
+            )
+            gemini_payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}
+            }
+            res = requests.post(gemini_url, json=gemini_payload, timeout=30)
+            if res.status_code == 200:
+                raw_text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                raw_text = re.sub(r"```(?:json)?\s*", "", raw_text).strip().rstrip("`")
+                match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+                if match:
+                    data = json.loads(match.group(0))
+                    if "scenes" in data and len(data["scenes"]) > 0:
+                        print("[AI Script] Used Gemini Flash fallback")
+                        return data
+        except Exception as e:
+            print(f"[Gemini fallback notice]: {e}")
 
     # Fallback template if Groq is not configured or fails
     return {
@@ -183,50 +187,96 @@ def get_audio_duration(audio_path: Path) -> float:
     return float(result.stdout.strip())
 
 
-def _download_ddg_image(query: str, output_path: Path, scene_index: int = 0) -> bool:
-    """Fetches a real, high-resolution topic image from DuckDuckGo image search."""
+def _download_image_url(url: str, output_path: Path, min_size: int = 15000) -> bool:
+    """Helper: download any image URL to a file. Returns True on success."""
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "VideoFarmStudio/1.0", "Accept": "image/*,*/*"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as res:
+            data = res.read()
+        if len(data) > min_size:
+            with open(output_path, "wb") as f:
+                f.write(data)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _download_wikimedia_image(query: str, output_path: Path, scene_index: int = 0) -> bool:
+    """
+    Fetches high-resolution images from Wikimedia Commons.
+    NO API KEY required — completely free and stable.
+    Docs: https://commons.wikimedia.org/w/api.php
+    """
     try:
         clean_q = re.sub(r'[^\w\s-]', ' ', query).strip()
         if not clean_q:
             return False
 
-        token_url = f"https://duckduckgo.com/?q={urllib.parse.quote(clean_q)}"
-        req = urllib.request.Request(token_url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
-        with urllib.request.urlopen(req, timeout=5) as res:
-            content = res.read().decode("utf-8", errors="ignore")
-        match = re.search(r"vqd=([\d-]+)", content)
-        if not match:
-            return False
-        vqd = match.group(1)
-
-        search_url = f"https://duckduckgo.com/i.js?l=us-en&o=json&q={urllib.parse.quote(clean_q)}&vqd={vqd}&f=,,,&p=1"
-        req2 = urllib.request.Request(search_url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
-        with urllib.request.urlopen(req2, timeout=6) as res2:
-            results = json.loads(res2.read().decode("utf-8")).get("results", [])
+        # Step 1: Search Wikimedia Commons for matching files
+        search_url = (
+            "https://commons.wikimedia.org/w/api.php"
+            f"?action=query&list=search&srsearch={urllib.parse.quote(clean_q)}"
+            "&srnamespace=6&srlimit=15&format=json"
+        )
+        req = urllib.request.Request(search_url, headers={"User-Agent": "VideoFarmStudio/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as res:
+            results = json.loads(res.read()).get("query", {}).get("search", [])
 
         if not results:
             return False
 
-        # Use scene_index offset so each scene gets a distinct image
-        start_idx = scene_index % len(results)
-        candidates = results[start_idx:] + results[:start_idx]
+        # Pick a different result per scene to avoid repeating the same image
+        pick = results[scene_index % len(results)]
+        title = pick["title"]  # e.g. "File:Black hole Cygnus X-1.png"
 
-        for r in candidates[:6]:
-            img_url = r.get("image")
-            if not img_url:
-                continue
-            try:
-                dl_req = urllib.request.Request(img_url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(dl_req, timeout=8) as img_res:
-                    data = img_res.read()
-                    if len(data) > 15000:
-                        with open(output_path, "wb") as f:
-                            f.write(data)
-                        return True
-            except Exception:
-                continue
+        # Step 2: Get the actual download URL via imageinfo API
+        info_url = (
+            "https://commons.wikimedia.org/w/api.php"
+            f"?action=query&titles={urllib.parse.quote(title)}"
+            "&prop=imageinfo&iiprop=url&iiurlwidth=1280&format=json"
+        )
+        req2 = urllib.request.Request(info_url, headers={"User-Agent": "VideoFarmStudio/1.0"})
+        with urllib.request.urlopen(req2, timeout=8) as res2:
+            pages = json.loads(res2.read()).get("query", {}).get("pages", {})
+            for page in pages.values():
+                ii = page.get("imageinfo", [{}])[0]
+                img_url = ii.get("thumburl") or ii.get("url")
+                if img_url and _download_image_url(img_url, output_path):
+                    print(f"[Visual] Wikimedia Commons: {output_path.name}")
+                    return True
     except Exception as e:
-        print(f"[Visual DDG Notice]: {e}")
+        print(f"[Visual Wikimedia Notice]: {e}")
+    return False
+
+
+def _download_pexels_image(query: str, output_path: Path, scene_index: int = 0) -> bool:
+    """
+    Fetches HD images from Pexels API.
+    Requires PEXELS_API_KEY in .env — FREE at https://pexels.com/api
+    Activates automatically when key is present.
+    """
+    pexels_key = os.environ.get("PEXELS_API_KEY", "")
+    if not pexels_key:
+        return False
+    try:
+        clean_q = re.sub(r'[^\w\s-]', ' ', query).strip()
+        url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(clean_q)}&per_page=15&orientation=landscape"
+        req = urllib.request.Request(url, headers={"Authorization": pexels_key})
+        with urllib.request.urlopen(req, timeout=8) as res:
+            photos = json.loads(res.read()).get("photos", [])
+        if not photos:
+            return False
+        pick = photos[scene_index % len(photos)]
+        img_url = pick.get("src", {}).get("large2x") or pick.get("src", {}).get("large")
+        if img_url and _download_image_url(img_url, output_path):
+            print(f"[Visual] Pexels HD: {output_path.name}")
+            return True
+    except Exception as e:
+        print(f"[Pexels notice]: {e}")
     return False
 
 
@@ -357,27 +407,31 @@ def fetch_scene_visual(
         except Exception as e:
             print(f"[Visual Notice]: AI generation skipped ({e}), falling back to real-time topic photo search...")
 
-    # 2. Real-Time Web Image Search via DuckDuckGo (Topic-specific, 100% relevant)
-    if _download_ddg_image(search_keywords, output_path, scene_index=scene_index):
+    # 2. Pexels HD — best quality, auto-enabled when PEXELS_API_KEY is in .env
+    if _download_pexels_image(search_keywords, output_path, scene_index=scene_index):
         return
 
-    # If specific search keywords were too narrow, retry DDG with main topic
+    # 3. Wikimedia Commons — millions of CC-licensed images, NO API key needed
+    if _download_wikimedia_image(search_keywords, output_path, scene_index=scene_index):
+        return
+
+    # Retry Wikimedia with broader topic if specific query failed
     if topic and topic.lower() not in search_keywords.lower():
-        if _download_ddg_image(f"{topic} documentary {scene_index + 1}", output_path, scene_index=scene_index):
+        if _download_wikimedia_image(topic, output_path, scene_index=scene_index):
             return
 
-    # 3. Wikipedia High-Resolution Topic Search
+    # 3. Wikipedia REST API — HD article thumbnails, NO API key needed
     if _download_wikipedia_image(search_keywords, output_path, scene_index=scene_index):
         return
 
     if topic and _download_wikipedia_image(topic, output_path, scene_index=scene_index):
         return
 
-    # 4. Openverse Public Domain Search
+    # 4. Openverse — Creative Commons images, NO API key needed
     if _download_openverse_image(search_keywords, output_path, scene_index=scene_index):
         return
 
-    # 5. Guaranteed Unique Procedural Themed Backdrop (No generic repeated photos!)
+    # 5. Guaranteed Procedural Backdrop (always works, local, no network needed)
     _generate_procedural_backdrop(topic or search_keywords, scene_index, width, height, output_path)
 
 
