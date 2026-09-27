@@ -154,7 +154,7 @@ async def get_voices():
 @app.get("/api/voice-preview/{voice_id}")
 async def get_voice_preview(voice_id: str):
     try:
-        path = video_engine.get_voice_preview_path(voice_id)
+        path = await video_engine.get_voice_preview_path(voice_id)
         if path.exists():
             return FileResponse(path, media_type="audio/mpeg")
     except Exception as e:
@@ -193,10 +193,10 @@ async def generate_single_visual(req: ImageGenRequest):
 
 @app.get("/api/status")
 async def get_system_status():
-    has_groq = bool(os.environ.get("GROQ_API_KEY"))
+    k = os.environ.get("GROQ_API_KEY", "")
+    has_groq = bool(k and not k.startswith("gsk_your_"))
     groq_masked = ""
     if has_groq:
-        k = os.environ.get("GROQ_API_KEY", "")
         groq_masked = f"{k[:7]}...{k[-4:]}" if len(k) > 11 else "Configured"
 
     return {
@@ -258,24 +258,11 @@ def run_clipper_worker(job_id: str, request_data: YouTubeClipRequest):
 
     try:
         JOBS[job_id]["status"] = "processing"
-        update_log("Initializing YouTube Clipper...", 10, "Downloading")
-        
+        update_log("Initializing YouTube Clipper...", 5, "Starting")
+
         clipper = YouTubeClipper(OUTPUT_DIR / job_id)
-        
-        # Override print to capture logs
-        class LogCapturer:
-            def write(self, msg):
-                if msg.strip():
-                    update_log(msg.strip(), 50, "Processing")
-            def flush(self): pass
-        
-        old_stdout = sys.stdout
-        sys.stdout = LogCapturer()
-        try:
-            result = clipper.process(request_data.url)
-        finally:
-            sys.stdout = old_stdout
-            
+        result = clipper.process(request_data.url, log_fn=update_log)
+
         if result.get("status") == "success":
             JOBS[job_id]["status"] = "completed"
             JOBS[job_id]["progress"] = 100
@@ -283,6 +270,9 @@ def run_clipper_worker(job_id: str, request_data: YouTubeClipRequest):
             JOBS[job_id]["video_url"] = f"/output/{job_id}/{result.get('file_name')}"
             JOBS[job_id]["title"] = result.get("title", "YouTube Clip")
             JOBS[job_id]["description"] = result.get("reasoning", "")
+            JOBS[job_id]["hook"] = result.get("hook", "")
+            JOBS[job_id]["clip_duration"] = result.get("duration", 0)
+            update_log(f"Done! Clip is {result.get('duration', 0)}s long", 100, "Complete")
         else:
             raise Exception(result.get("message", "Unknown error"))
     except Exception as e:
@@ -376,7 +366,21 @@ async def update_groq_key(req: KeyUpdateRequest):
         raise HTTPException(status_code=400, detail="Key cannot be empty")
     os.environ["GROQ_API_KEY"] = key
     env_file = Path(".env")
-    env_file.write_text(f"GROQ_API_KEY={key}\n", encoding="utf-8")
+    lines = env_file.read_text(encoding="utf-8").splitlines() if env_file.exists() else []
+    updated = False
+    for i, line in enumerate(lines):
+        if line.startswith("GROQ_API_KEY="):
+            lines[i] = f"GROQ_API_KEY={key}"
+            updated = True
+            break
+    if not updated:
+        lines.append(f"GROQ_API_KEY={key}")
+    env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    
+    # Also update youtube_clipper's environment directly if it's imported
+    import os
+    os.environ["GROQ_API_KEY"] = key
+    
     return {"success": True, "message": "Groq API Key saved successfully"}
 
 
